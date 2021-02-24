@@ -18,14 +18,6 @@ contract PoolPod {
 	mapping (address => uint256) _balances;
 
 	uint256 private _knownPAssetHoldings;
-	uint256 private ownerCount = 0;
-
-	mapping (address => ContributorInfo) public contributors;
-
-	struct ContributorInfo {
-		uint256 shareScalarAtJoin;
-		uint256 assetsWithdrawn;
-	}
 
 	constructor(address _pAsset, address _asset, address _poolAddress) public {
 		pAsset = _pAsset;
@@ -51,7 +43,7 @@ contract PoolPod {
 		_multiplier = getCurMultiplier(temp);
 		_knownPAssetHoldings = temp;
 	}
-// 
+
 	function getCurMultiplier(uint256 assets) public view returns(uint256){
 		if(assets == 0){
 			return _multiplier;

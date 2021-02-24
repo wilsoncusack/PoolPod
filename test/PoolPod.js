@@ -112,9 +112,6 @@ describe("PoolPod contract", function () {
 
 			await contribute(addr3, amount)
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			// console.log("in test " + Math.pow(10,18) * 1 + "")
-			console.log("yo " + ethers.BigNumber.from(addr3Balance))
-			// console.log("hi " + ethers.BigNumber.from("1500000000000000000").mul(ethers.BigNumber.from("666666666666666666")))
 			expect(addr3Balance).to.eq(amount)
 
 			addr1Balance = await PoolPod.balanceOf(addr1.address)
