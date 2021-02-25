@@ -1,5 +1,6 @@
 pragma solidity ^0.6.12;
 import '@pooltogether/pooltogether-contracts/contracts/prize-pool/PrizePoolInterface.sol';
+import '@pooltogether/pooltogether-contracts/contracts/prize-strategy/PeriodicPrizeStrategy.sol';
 import './interfaces/IERC20.sol';
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
@@ -10,20 +11,34 @@ contract PoolPod {
 	
 	address public pAsset;
 	address public asset;
-	address public poolAddress;
+	address public pool;
+	address public prizeStrategy;
 
 	
-	uint256 public SCALAR = 1e18;
-	uint256 private _multiplier = 1e18;
+	uint256 public SCALAR = 1e10;
+	uint256 private _multiplier = 1e10;
 	mapping (address => uint256) _balances;
 
 	uint256 private _knownPAssetHoldings;
+	uint256 private _totalShares;
 
-	constructor(address _pAsset, address _asset, address _poolAddress) public {
+	mapping (address => ContributorInfo) public getContributor;
+
+	struct ContributorInfo {
+		uint256 multOffset;
+		uint256 shares;
+	}
+	
+
+	constructor(address _pAsset, address _asset, address _pool, address _prizeStrategy) public {
 		pAsset = _pAsset;
 		asset = _asset;
-		poolAddress = _poolAddress;
-		IERC20(asset).approve(poolAddress, type(uint256).max);
+		pool = _pool;
+		prizeStrategy = _prizeStrategy;
+		IERC20(asset).approve(pool, type(uint256).max);
+
+		// delete me! 
+		IERC20(pAsset).approve(pool, type(uint256).max);
 	}
 
 	function assetsOwned() public view returns(uint256){
@@ -39,60 +54,80 @@ contract PoolPod {
 	}
 
 	function updateMultiplier() public {
-		uint256 temp = pAssetsOwned();
-		_multiplier = getCurMultiplier(temp);
-		_knownPAssetHoldings = temp;
+		uint256 assets = pAssetsOwned();
+		_multiplier = getCurMultiplier(assets);
+		_knownPAssetHoldings = assets;
 	}
 
-	function getCurMultiplier(uint256 assets) public view returns(uint256){
-		if(assets == 0){
+	function getCurMultiplier(uint256 assets) public view returns(uint256 newMultiplier){
+		uint256 winnings = assets.sub(_knownPAssetHoldings);
+		if(winnings == 0){
 			return _multiplier;
 		}
-	
-		uint256 winnings = assets.sub(_knownPAssetHoldings);
+
 		return _multiplier.add(
-			winnings.mul(SCALAR).div(_knownPAssetHoldings)
+			// winnings.mul(SCALAR).div((_pAssetsOwned + nonCommittedFunds()).sub(_knownWinningsStillHeld + winnings))
+			winnings.mul(SCALAR).div(_totalShares)
 			);
 	}
 
 	function balanceOf(address account) public view returns(uint256) {
-		return _balances[account].mul(
-			getCurMultiplier(
-				pAssetsOwned()
-				)
-			).div(SCALAR);
+		return getContributor[account]
+			.shares
+			.mul(getCurMultiplier(pAssetsOwned()) - getContributor[account].multOffset)
+			.div(SCALAR);
+	}
+
+	function _balanceOfWithoutMultiplierUpdate(address account) private returns(uint256) {
+		return getContributor[account]
+			.shares
+			.mul(_multiplier - getContributor[account].multOffset)
+			.div(SCALAR);
+	}
+
+	function recomputeShares(address account) public {
+		updateMultiplier();
+		_recomputeSharesWithoutMultiplierUpdate(0, msg.sender);
+		
+	}
+
+	function _recomputeSharesWithoutMultiplierUpdate(uint256 newAmount, address account) private {
+		uint256 shares = _balanceOfWithoutMultiplierUpdate(msg.sender) + newAmount;
+		_totalShares = _totalShares + shares - getContributor[msg.sender].shares;
+		getContributor[msg.sender].shares = shares;
+		getContributor[msg.sender].multOffset = _multiplier - 1e10;
 	}
 
 
 	function contribute(uint256 amount) external {
+		// require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), "PoolPod: Cannot contribute while prize is being awarded")
+
 		updateMultiplier();
-		_balances[msg.sender] = _balances[msg.sender].add(
-			amount.mul(SCALAR).div(_multiplier)
-			);
 		IERC20(asset).transferFrom(msg.sender, address(this), amount);
+		_recomputeSharesWithoutMultiplierUpdate(amount, msg.sender);
 	}
 
 
 	function commit() external {
 		uint256 amount = nonCommittedFunds();
-		PrizePoolInterface(poolAddress).depositTo(address(this), amount, asset, address(0));
-		_knownPAssetHoldings = _knownPAssetHoldings + amount;
+		PrizePoolInterface(pool).depositTo(address(this), amount, asset, address(0));
+		_knownPAssetHoldings = pAssetsOwned();
 	}
 
 	function withdraw(uint256 amount) external {
-		balanceOf(msg.sender).sub(amount, "PoolPod: withdraw amount exceeds balance");
+		recomputeShares(msg.sender);
+		uint256 balance = getContributor[msg.sender].shares;
+		balance.sub(amount, "PoolPod: withdraw amount exceeds balance");
 
-		uint256 notCommittedFunds = nonCommittedFunds();		
+		uint256 notCommittedFunds = nonCommittedFunds();	
 		if(notCommittedFunds >= amount){
 			IERC20(asset).transfer(msg.sender, amount);
-			notCommittedFunds = notCommittedFunds - amount;
 		} else {
-			PrizePoolInterface(poolAddress).withdrawInstantlyFrom(address(this), amount - notCommittedFunds, asset, type(uint256).max);
-			IERC20(asset).transfer(msg.sender, amount);
-			_knownPAssetHoldings = _knownPAssetHoldings - amount - notCommittedFunds;
+			uint256 fee = PrizePoolInterface(pool).withdrawInstantlyFrom(address(this), amount - notCommittedFunds, asset, type(uint256).max);
+			IERC20(asset).transfer(msg.sender, amount - fee);
 		}
-		_balances[msg.sender] = _balances[msg.sender].sub(
-			amount.mul(SCALAR).div(_multiplier)
-			);
+		_knownPAssetHoldings = pAssetsOwned();
+		getContributor[msg.sender].shares = balance.sub(amount); 
+		_totalShares = _totalShares - amount;
 	}
 }

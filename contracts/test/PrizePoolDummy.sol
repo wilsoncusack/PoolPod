@@ -1,7 +1,7 @@
 import '@pooltogether/pooltogether-contracts/contracts/prize-pool/PrizePoolInterface.sol';
 import '../interfaces/IERC20.sol';
 
-contract PrizePool is PrizePoolInterface {
+contract PrizePoolDummy is PrizePoolInterface {
 
 	address private _controlledToken;
 	address[] private _tokens;
@@ -16,7 +16,9 @@ contract PrizePool is PrizePoolInterface {
     address controlledToken,
     uint256 maximumExitFee
   ) external override returns (uint256) {
-		IERC20(controlledToken).transfer(from, amount);
+		IERC20(_controlledToken).transferFrom(from, address(this), amount);
+    IERC20(controlledToken).transfer(from, amount);
+    return 0;
 	}
 
 	function depositTo(

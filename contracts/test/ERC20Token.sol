@@ -12,6 +12,6 @@ contract ERC20Token is ERC20 {
     using SafeMath for uint256;
 
     constructor() public ERC20("Fake DAI", "FDAI") {
-        _mint(msg.sender, 1000000 * (10 ** uint256(decimals())));
+        _mint(msg.sender, 1e16 * (10 ** uint256(decimals())));
     }
 }
