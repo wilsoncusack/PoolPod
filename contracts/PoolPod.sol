@@ -66,7 +66,6 @@ contract PoolPod {
 		}
 
 		return _multiplier.add(
-			// winnings.mul(SCALAR).div((_pAssetsOwned + nonCommittedFunds()).sub(_knownWinningsStillHeld + winnings))
 			winnings.mul(SCALAR).div(_totalShares)
 			);
 	}
@@ -100,7 +99,7 @@ contract PoolPod {
 
 
 	function contribute(uint256 amount) external {
-		// require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), "PoolPod: Cannot contribute while prize is being awarded")
+		require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), "PoolPod: Cannot contribute while prize is being awarded")
 
 		updateMultiplier();
 		IERC20(asset).transferFrom(msg.sender, address(this), amount);
