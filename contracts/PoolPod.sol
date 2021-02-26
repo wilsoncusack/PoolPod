@@ -16,7 +16,6 @@ contract PoolPod {
 
 	
 	uint256 public SCALAR = 1e10;
-	uint256 private _multiplier = 1e10;
 	mapping (address => uint256) _balances;
 
 	uint256 private _totalShares;
@@ -40,13 +39,9 @@ contract PoolPod {
 		return IERC20(asset).balanceOf(address(this));
 	}
 
-	function updateMultiplier() public {
-		_multiplier = getCurMultiplier();
-	}
-
 	function getCurMultiplier() public view returns(uint256 newMultiplier){
 		if(_totalShares == 0){
-			return _multiplier;
+			return SCALAR;
 		}
 
 		return assetsOwned().mul(SCALAR).div(_totalShares);
@@ -59,14 +54,13 @@ contract PoolPod {
 	function contribute(uint256 amount) external {
 		require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), 
 			"PoolPod: Cannot contribute while prize is being awarded");
-		updateMultiplier();
-		IERC20(asset).transferFrom(msg.sender, address(this), amount);
-		uint256 newShares = amount.mul(SCALAR).div(_multiplier);
+
+		uint256 newShares = amount.mul(SCALAR).div(getCurMultiplier());
+		IERC20(asset).transferFrom(msg.sender, address(this), amount);		
 		_totalShares = _totalShares + newShares;
 		_balances[msg.sender] = _balances[msg.sender] + newShares;
 
 	}
-
 
 	function commit() external {
 		uint256 amount = nonCommittedFunds();
@@ -74,12 +68,10 @@ contract PoolPod {
 	}
 
 	function withdraw(uint256 amount) external {
-		// recomputeShares(msg.sender);
-		updateMultiplier();
-		uint256 balance = balanceOf(msg.sender);
-		balance.sub(amount, "PoolPod: withdraw amount exceeds balance");
-		uint256 amountAsShares = amount.mul(SCALAR).div(_multiplier);
-
+		balanceOf(msg.sender).sub(amount, "PoolPod: withdraw amount exceeds balance");
+		
+		uint256 amountAsShares = amount.mul(SCALAR).div(getCurMultiplier());
+		
 		uint256 notCommittedFunds = nonCommittedFunds();	
 		if(notCommittedFunds >= amount){
 			IERC20(asset).transfer(msg.sender, amount);
@@ -87,7 +79,7 @@ contract PoolPod {
 			uint256 fee = PrizePoolInterface(pool).withdrawInstantlyFrom(address(this), amount - notCommittedFunds, asset, type(uint256).max);
 			IERC20(asset).transfer(msg.sender, amount - fee);
 		}
-		// _knownPAssetHoldings = pAssetsOwned();
+
 		_balances[msg.sender] = _balances[msg.sender] - amountAsShares;
 		_totalShares = _totalShares - amountAsShares;
 	}
