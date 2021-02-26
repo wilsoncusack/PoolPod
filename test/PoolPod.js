@@ -114,7 +114,7 @@ describe("PoolPod contract", function () {
 			// console.log(b.toString())
 			await contribute(addr3, amount)
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			expect(addr3Balance).to.eq(amount)
+			expect(addr3Balance).to.eq("999999999999999999")
 			// b = await pAsset.balanceOf(PoolPod.address);
 			// console.log(b.toString())
 
@@ -143,13 +143,13 @@ describe("PoolPod contract", function () {
 			await win(amount * BigInt(3))
 
 			addr1Balance = await PoolPod.balanceOf(addr1.address)
-			expect(addr1Balance).to.eq("2500000000000000000")
+			expect(addr1Balance).to.eq("2625000000000000000")
 
 			addr2Balance = await PoolPod.balanceOf(addr2.address)
-			expect(addr2Balance).to.eq("2500000000000000000")
+			expect(addr2Balance).to.eq("2625000000000000000")
 
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			expect(addr3Balance).to.eq("2000000000000000000")
+			expect(addr3Balance).to.eq("1749999999999999998")
 		});
 
 		it("balance = balance + prize with prize, two contributors, + contributor after + fist contributor adds", async function(){
@@ -172,13 +172,13 @@ describe("PoolPod contract", function () {
 			await contribute(addr1, amount)
 
 			addr1Balance = await PoolPod.balanceOf(addr1.address)
-			expect(addr1Balance).to.eq("3500000000000000000")
+			expect(addr1Balance).to.eq("3624999999999999999")
 
 			addr2Balance = await PoolPod.balanceOf(addr2.address)
-			expect(addr2Balance).to.eq("2500000000000000000")
+			expect(addr2Balance).to.eq("2625000000000000000")
 
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			expect(addr3Balance).to.eq("2000000000000000000")
+			expect(addr3Balance).to.eq("1749999999999999998")
 		});
 
 		it("balance = balance + prize with prize, two contributors, + contributor after + fist contributor adds + another win", async function(){
@@ -202,53 +202,30 @@ describe("PoolPod contract", function () {
 			await win(BigInt(a * 5.5))
 
 			addr1Balance = await PoolPod.balanceOf(addr1.address)
-			expect(addr1Balance).to.eq("7000000000000000000")
+			expect(addr1Balance).to.eq("6117187499999999998")
 
 			addr2Balance = await PoolPod.balanceOf(addr2.address)
-			expect(addr2Balance).to.eq("3500000000000000000")
+			expect(addr2Balance).to.eq("4429687500000000000")
 
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			expect(addr3Balance).to.eq("3000000000000000000")
+			expect(addr3Balance).to.eq("2953124999999999997")
 
-			await PoolPod.connect(addr2).withdraw(addr2Balance)
 
 			await PoolPod.connect(addr1).withdraw(addr1Balance)
-			addr2Balance = await PoolPod.balanceOf(addr2.address)
-
 			await PoolPod.connect(addr2).withdraw(addr2Balance)
 			await PoolPod.connect(addr3).withdraw(addr3Balance)
-		});
-
-		it("balance = balance + prize with prize, two contributors, + contributor after + fist contributor adds + another win with recompute", async function(){
-			const a = Math.pow(10,18)
-			const amount = BigInt(a);
-			await contribute(addr1,amount)
-
-			await contribute(addr2, amount)
-
-
-			// await pAsset.connect(addr1).transfer(PoolPod.address, amount)
-			await PoolPod.commit();
-			await win(amount)
-
-			await contribute(addr3, amount)
-			await PoolPod.commit();
-
-			await win(amount * BigInt(3))
-
-			await contribute(addr1, amount)
-			await PoolPod.recomputeShares(addr2.address)
-			await win(amount * BigInt(4))
 
 			addr1Balance = await PoolPod.balanceOf(addr1.address)
-			expect(addr1Balance).to.eq("6045454545200000000")
+			expect(addr1Balance).to.eq("2")
 
 			addr2Balance = await PoolPod.balanceOf(addr2.address)
-			expect(addr2Balance).to.eq("3227272727200000000")
+			expect(addr2Balance).to.eq("0")
 
 			var addr3Balance = await PoolPod.balanceOf(addr3.address)
-			expect(addr3Balance).to.eq("2727272727200000000")
+			expect(addr3Balance).to.eq("2")
 		});
+
+
 	});
 
 	describe("withdraw", function () {
