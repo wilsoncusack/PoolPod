@@ -4,6 +4,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import '@pooltogether/pooltogether-contracts/contracts/prize-pool/PrizePoolInterface.sol';
 import '@pooltogether/pooltogether-contracts/contracts/prize-strategy/PeriodicPrizeStrategy.sol';
+import '@pooltogether/pooltogether-contracts/contracts/token-faucet/TokenFaucet.sol';
 import '@pooltogether/loot-box/contracts/LootBox.sol';
 import './interfaces/IERC20.sol';
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -18,6 +19,8 @@ contract PoolPod {
 	address public pool;
 	address public prizeStrategy;
 	address public owner;
+	address public poolToken;
+	address public poolFaucet;
 
 	
 	uint256 public SCALAR = 1e10;
@@ -25,16 +28,18 @@ contract PoolPod {
 
 	uint256 private _totalShares;
 
-	constructor(address _pAsset, address _asset, address _pool, address _prizeStrategy) public {
+	constructor(address _pAsset, address _asset, address _pool, address _prizeStrategy, address _poolToken, address _poolFaucet) public {
 		pAsset = _pAsset;
 		asset = _asset;
 		pool = _pool;
 		prizeStrategy = _prizeStrategy;
 		IERC20(asset).approve(pool, type(uint256).max);
 		owner = msg.sender;
+		poolToken = _poolToken;
+		poolFaucet = _poolFaucet;
 
 		// delete me! 
-		IERC20(pAsset).approve(pool, type(uint256).max);
+		// IERC20(pAsset).approve(pool, type(uint256).max);
 	}
 
 	function assetsOwned() public view returns(uint256){
@@ -58,8 +63,8 @@ contract PoolPod {
 	}
 
 	function contribute(uint256 amount) external {
-		// require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), 
-		// 	"PoolPod: Cannot contribute while prize is being awarded");
+		require(!PeriodicPrizeStrategy(prizeStrategy).isRngRequested(), 
+			"PoolPod: Cannot contribute while prize is being awarded");
 
 		uint256 newShares = amount.mul(SCALAR).div(getCurMultiplier());
 		IERC20(asset).transferFrom(msg.sender, address(this), amount);		
@@ -92,20 +97,6 @@ contract PoolPod {
 
 	///// Loot Box Logic ////
 
-	/// @notice A structure to define ERC721 transfer contents
-  // struct WithdrawERC721 {
-  //   IERC721Upgradeable token;
-  //   uint256[] tokenIds;
-  // }
-
-  // /// @notice A structure to define ERC1155 transfer contents
-  // struct WithdrawERC1155 {
-  //   IERC1155Upgradeable token;
-  //   uint256[] ids;
-  //   uint256[] amounts;
-  //   bytes data;
-  // }
-
 	function plunder(
 	   IERC20Upgradeable[] memory erc20,
 	    LootBox.WithdrawERC721[] memory erc721,
@@ -122,4 +113,15 @@ contract PoolPod {
         require(msg.sender == owner, 'PoolPod: FORBIDDEN');
         owner = _owner;
     }
+
+    // POOL token logic 
+    function claim() external {
+    	TokenFaucet(poolFaucet).claim(address(this));
+    }
+
+    function transferPool(address to, uint256 amount) external {
+    	require(msg.sender == owner, 'PoolPod: FORBIDDEN');
+    	IERC20(poolToken).transfer(to, amount);
+    }
+
 }
