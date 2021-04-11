@@ -4,10 +4,12 @@ import '../interfaces/IERC20.sol';
 contract PrizePoolDummy is PrizePoolInterface {
 
 	address private _controlledToken;
+  address private _asset;
 	address[] private _tokens;
 
-	constructor(address controlledToken) public {
+	constructor(address controlledToken, address asset) public {
 		_controlledToken = controlledToken;
+    _asset = asset;
 	}
 
 	function withdrawInstantlyFrom(
@@ -16,7 +18,7 @@ contract PrizePoolDummy is PrizePoolInterface {
     address controlledToken,
     uint256 maximumExitFee
   ) external override returns (uint256) {
-		IERC20(_controlledToken).transferFrom(from, address(this), amount);
+		IERC20(_asset).transferFrom(from, address(this), amount);
     IERC20(controlledToken).transfer(from, amount);
     return 0;
 	}
@@ -28,7 +30,7 @@ contract PrizePoolDummy is PrizePoolInterface {
     address referrer
   )
     external override {
-    	IERC20(controlledToken).transferFrom(to, address(this), amount);
+    	IERC20(_asset).transferFrom(to, address(this), amount);
     	IERC20(_controlledToken).transfer(to, amount);
     }
 
@@ -197,7 +199,7 @@ contract PrizePoolDummy is PrizePoolInterface {
   /// @dev Returns the address of the underlying ERC20 asset
   /// @return The address of the asset
   function token() external override view returns (address) {
-  	return address(0);
+  	return _asset;
   }
 
   /// @notice An array of the Tokens controlled by the Prize Pool (ie. Tickets, Sponsorship)

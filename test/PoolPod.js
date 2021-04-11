@@ -22,7 +22,7 @@ describe("PoolPod contract", function () {
 	    PoolPodContract = await ethers.getContractFactory("PoolPod");
 	    pAsset.connect(addr1).transfer(PrizePool.address, BigInt(Math.pow(10, 30)))
 	    
-	    PoolPod = await PoolPodContract.deploy(pAsset.address, asset.address, PrizePool.address, asset.address);
+	    PoolPod = await PoolPodContract.deploy(pAsset.address, PrizePool.address, asset.address, asset.address);
 	    await PoolPod.deployed();
   	});	
 
@@ -292,7 +292,7 @@ describe("PoolPod contract", function () {
 
 	async function deployPrizePool(pAsset) {
 		PrizePoolContract = await ethers.getContractFactory("PrizePoolDummy");
-	    PrizePool = await PrizePoolContract.deploy(pAsset);
+	    PrizePool = await PrizePoolContract.deploy(pAsset, asset.address);
 	    await PrizePool.deployed();
 	}	
 

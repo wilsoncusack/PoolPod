@@ -3,15 +3,18 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import '@pooltogether/pooltogether-contracts/contracts/prize-pool/PrizePoolInterface.sol';
+import '@pooltogether/pooltogether-contracts/contracts/prize-pool/PrizePool.sol';
 import '@pooltogether/pooltogether-contracts/contracts/prize-strategy/PeriodicPrizeStrategy.sol';
 import '@pooltogether/pooltogether-contracts/contracts/token-faucet/TokenFaucet.sol';
 import '@pooltogether/loot-box/contracts/LootBox.sol';
-import './interfaces/IERC20.sol';
+
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "hardhat/console.sol";
 
-contract PoolPod {
+contract PoolPod is ERC20 {
 	using SafeMath for uint256;
 	
 	address public pAsset;
@@ -22,23 +25,26 @@ contract PoolPod {
 	address public poolToken;
 	address public poolFaucet;
 
+	address public commitRewardToken;
+	uint256 public commitReward;
+
 	
 	uint256 public SCALAR = 1e10;
 	mapping (address => uint256) _balances;
 
 	uint256 private _totalShares;
 
-	constructor(address _pAsset, address _asset, address _pool, address _prizeStrategy, address _poolToken, address _poolFaucet) public {
+	constructor(address _pAsset, address _pool, address _poolToken, address _poolFaucet) public ERC20("Pool Pod DAI", "ppDAI") {
 		pAsset = _pAsset;
-		asset = _asset;
+		asset = PrizePoolInterface(_pool).token();
 		pool = _pool;
-		prizeStrategy = _prizeStrategy;
-		IERC20(asset).approve(pool, type(uint256).max);
 		owner = msg.sender;
 		poolToken = _poolToken;
 		poolFaucet = _poolFaucet;
+		updatePrizeStrategy();
+		IERC20(asset).approve(pool, type(uint256).max);
 
-		// delete me! 
+		// delete me! testing only
 		// IERC20(pAsset).approve(pool, type(uint256).max);
 	}
 
@@ -58,7 +64,7 @@ contract PoolPod {
 		return assetsOwned().mul(SCALAR).div(_totalShares);
 	}
 
-	function balanceOf(address account) public view returns(uint256) {
+	function balanceOf(address account) public override view returns(uint256) {
 		return _balances[account].mul(getCurMultiplier()).div(SCALAR);
 	}
 
@@ -75,7 +81,11 @@ contract PoolPod {
 
 	function commit() external {
 		uint256 amount = nonCommittedFunds();
-		PrizePoolInterface(pool).depositTo(address(this), amount, asset, address(0));
+		PrizePoolInterface(pool).depositTo(address(this), amount, pAsset, address(0));
+
+		if(IERC20(commitRewardToken).balanceOf(address(this)) >= commitReward){
+			IERC20(commitRewardToken).transfer(msg.sender, commitReward);
+		}
 	}
 
 	function withdraw(uint256 amount) external {
@@ -87,12 +97,16 @@ contract PoolPod {
 		if(notCommittedFunds >= amount){
 			IERC20(asset).transfer(msg.sender, amount);
 		} else {
-			uint256 fee = PrizePoolInterface(pool).withdrawInstantlyFrom(address(this), amount - notCommittedFunds, asset, type(uint256).max);
+			uint256 fee = PrizePoolInterface(pool).withdrawInstantlyFrom(address(this), amount - notCommittedFunds, pAsset, type(uint256).max);
 			IERC20(asset).transfer(msg.sender, amount - fee);
 		}
 
 		_balances[msg.sender] = _balances[msg.sender] - amountAsShares;
 		_totalShares = _totalShares - amountAsShares;
+	}
+
+	function updatePrizeStrategy() public {
+		prizeStrategy = address(PrizePool(pool).prizeStrategy());
 	}
 
 	///// Loot Box Logic ////
@@ -103,14 +117,13 @@ contract PoolPod {
 	    LootBox.WithdrawERC1155[] memory erc1155,
 	    address lootBoxAddress,
 	    address payable to
-  	) external {
-  		require(msg.sender == owner, 'PoolPod: FORBIDDEN');
+  	) ownerOnly external {
+
   		LootBox(lootBoxAddress).plunder(erc20, erc721, erc1155, to);
   	}
 
 
-    function setOwner(address _owner) external {
-        require(msg.sender == owner, 'PoolPod: FORBIDDEN');
+    function setOwner(address _owner) ownerOnly external {
         owner = _owner;
     }
 
@@ -119,9 +132,13 @@ contract PoolPod {
     	TokenFaucet(poolFaucet).claim(address(this));
     }
 
-    function transferPool(address to, uint256 amount) external {
-    	require(msg.sender == owner, 'PoolPod: FORBIDDEN');
+    function transferPool(address to, uint256 amount) ownerOnly external {
     	IERC20(poolToken).transfer(to, amount);
+    }
+
+    modifier ownerOnly(){
+        require(msg.sender == owner, 'PoolPod: FORBIDDEN');
+        _;
     }
 
 }
